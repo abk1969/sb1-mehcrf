@@ -1,94 +1,85 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useCallback } from 'react';
 import { PlatformSelector } from '../components/PlatformSelector';
 import { MessageInput } from '../components/MessageInput';
-import { ResponseDisplay } from '../components/ResponseDisplay';
-import { OnboardingSteps } from '../components/OnboardingSteps';
+import { ChatInterface } from '../components/ChatInterface';
+import { OnboardingOverlay } from '../components/OnboardingOverlay';
 import { FeedbackDialog } from '../components/FeedbackDialog';
 import { Platform, ToneType } from '../types';
-import { generateAIResponse } from '../services/openai';
-import { apiKeyService } from '../services/apiKey';
+import { useAgent } from '../hooks/useAgent';
+import { useApiKey } from '../hooks/useApiKey';
+import { useChat } from '../hooks/useChat';
 import { toast } from 'sonner';
 
 export function Generator() {
-  const navigate = useNavigate();
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
   const [message, setMessage] = useState('');
   const [tone, setTone] = useState<ToneType>('professional');
-  const [isLoading, setIsLoading] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
-  const [responseCount, setResponseCount] = useState(0);
-  const [generatedResponse, setGeneratedResponse] = useState('');
+  const { runAgent, isLoading } = useAgent();
+  const { hasApiKey } = useApiKey();
+  const { messages, addMessage } = useChat();
 
-  useEffect(() => {
-    const count = parseInt(localStorage.getItem('responseCount') || '0', 10);
-    setResponseCount(count);
-
-    // Check for API key on component mount
-    if (!apiKeyService.hasApiKey()) {
+  const handleSubmit = useCallback(async () => {
+    if (!hasApiKey()) {
       toast.error('Veuillez configurer votre clé API OpenAI dans les paramètres');
-      navigate('/settings');
-    }
-  }, [navigate]);
-
-  const handleSubmit = async () => {
-    if (!selectedPlatform || !message) {
-      toast.error('Veuillez remplir tous les champs requis');
       return;
     }
 
-    const apiKey = apiKeyService.getApiKey();
-    if (!apiKey) {
-      toast.error('Clé API manquante. Veuillez la configurer dans les paramètres');
-      navigate('/settings');
+    if (!selectedPlatform) {
+      toast.error('Veuillez sélectionner une plateforme');
       return;
     }
 
-    setIsLoading(true);
+    if (!message.trim()) {
+      toast.error('Veuillez entrer un message');
+      return;
+    }
+
+    // Add user message immediately
+    addMessage({
+      type: 'user',
+      content: message,
+      timestamp: new Date()
+    });
+
     try {
-      const response = await generateAIResponse({
-        platform: selectedPlatform,
-        message,
-        tone,
-        apiKey
+      const response = await runAgent(selectedPlatform, message, tone);
+      
+      // Add bot response
+      addMessage({
+        type: 'bot',
+        content: response,
+        timestamp: new Date()
       });
-
-      setGeneratedResponse(response);
       
-      const newCount = responseCount + 1;
-      setResponseCount(newCount);
-      localStorage.setItem('responseCount', newCount.toString());
+      // Clear input
+      setMessage('');
       
-      if (newCount % 5 === 0) {
+      // Show feedback dialog every 5 messages
+      const messageCount = parseInt(localStorage.getItem('messageCount') || '0', 10) + 1;
+      localStorage.setItem('messageCount', messageCount.toString());
+      if (messageCount % 5 === 0) {
         setShowFeedback(true);
       }
     } catch (error) {
-      if (error instanceof Error) {
-        toast.error(error.message);
-      } else {
-        toast.error('Une erreur est survenue lors de la génération de la réponse');
-      }
-      console.error('Error generating response:', error);
-    } finally {
-      setIsLoading(false);
+      toast.error(error instanceof Error ? error.message : 'Une erreur est survenue');
     }
-  };
+  }, [selectedPlatform, message, tone, hasApiKey, runAgent, addMessage]);
 
-  const handleFeedback = (feedback: { rating: number; comment: string }) => {
-    console.log('Feedback:', feedback);
+  const handleFeedback = useCallback((feedback: { rating: number; comment: string }) => {
     setShowFeedback(false);
     toast.success('Merci pour votre retour !');
-  };
+  }, []);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12 space-y-12">
-      <OnboardingSteps />
+      <OnboardingOverlay />
       
       <section>
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Générateur de réponses</h1>
           <p className="text-gray-600 mt-2">
-            Sélectionnez votre plateforme et générez une réponse professionnelle en quelques secondes
+            Sélectionnez une plateforme et générez une réponse professionnelle
           </p>
         </div>
         <PlatformSelector
@@ -100,18 +91,20 @@ export function Generator() {
       {selectedPlatform && (
         <section className="space-y-8">
           <MessageInput
-            message={message}
-            tone={tone}
-            onMessageChange={setMessage}
-            onToneChange={setTone}
+            value={message}
+            onChange={setMessage}
             onSubmit={handleSubmit}
             isLoading={isLoading}
+            tone={tone}
+            onToneChange={setTone}
           />
 
-          <ResponseDisplay
-            response={generatedResponse}
-            isLoading={isLoading}
-          />
+          {messages.length > 0 && (
+            <ChatInterface
+              messages={messages}
+              isLoading={isLoading}
+            />
+          )}
         </section>
       )}
 

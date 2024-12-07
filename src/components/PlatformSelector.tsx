@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mail, Linkedin, Instagram, Twitter } from 'lucide-react';
+import { Mail, Linkedin, Twitter, Instagram } from 'lucide-react';
 import { Platform } from '../types';
 import { Tooltip } from './Tooltip';
 import clsx from 'clsx';
@@ -10,30 +10,30 @@ interface PlatformSelectorProps {
 }
 
 const platforms = [
-  { 
+  {
     id: 'gmail' as Platform,
     icon: Mail,
     label: 'Gmail',
     description: 'Idéal pour les emails professionnels et personnels'
   },
-  { 
+  {
     id: 'linkedin' as Platform,
     icon: Linkedin,
     label: 'LinkedIn',
     description: 'Parfait pour le réseautage professionnel'
   },
-  { 
-    id: 'instagram' as Platform,
-    icon: Instagram,
-    label: 'Instagram',
-    description: 'Adapté aux interactions sociales et au marketing'
-  },
-  { 
+  {
     id: 'twitter' as Platform,
     icon: Twitter,
     label: 'Twitter',
     description: 'Pour des réponses concises et engageantes'
   },
+  {
+    id: 'instagram' as Platform,
+    icon: Instagram,
+    label: 'Instagram',
+    description: 'Adapté aux interactions sociales et au marketing'
+  }
 ];
 
 export function PlatformSelector({ selectedPlatform, onSelect }: PlatformSelectorProps) {

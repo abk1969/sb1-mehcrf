@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Cog, Key, Bot, Database } from 'lucide-react';
+import { Cog, Key, Bot, Database, Info } from 'lucide-react';
 import { ModelSelector } from '../components/ModelSelector';
+import { ApiKeyInput } from '../components/ApiKeyInput';
 import { Tooltip } from '../components/Tooltip';
-import { toast } from 'sonner';
-import { apiKeyService } from '../services/apiKey';
 import { SecurityBadge } from '../components/SecurityBadge';
-import { LoadingButton } from '../components/LoadingButton';
+import { useApiKey } from '../hooks/useApiKey';
+import { toast } from 'sonner';
 import clsx from 'clsx';
 
 interface Settings {
@@ -55,16 +55,17 @@ export function Settings() {
   const [activeSection, setActiveSection] = useState('api');
   const [settings, setSettings] = useState<Settings>(initialSettings);
   const [isSaving, setIsSaving] = useState(false);
+  const { getApiKey, setApiKey } = useApiKey();
 
   useEffect(() => {
-    const savedApiKey = apiKeyService.getApiKey();
+    const savedApiKey = getApiKey();
     if (savedApiKey) {
       setSettings(prev => ({
         ...prev,
         apiKey: savedApiKey
       }));
     }
-  }, []);
+  }, [getApiKey]);
 
   const handleApiKeyChange = (value: string) => {
     setSettings(prev => ({
@@ -74,20 +75,22 @@ export function Settings() {
   };
 
   const handleApiKeySave = async () => {
-    const { apiKey } = settings;
-    
-    if (!apiKey) {
+    if (!settings.apiKey) {
       toast.error('Veuillez entrer une clé API');
       return;
     }
 
     setIsSaving(true);
     try {
-      apiKeyService.saveApiKey(apiKey);
+      await setApiKey(settings.apiKey);
       toast.success('Clé API sauvegardée avec succès');
     } catch (error) {
       console.error('Error saving API key:', error);
-      toast.error('Erreur lors de la sauvegarde de la clé API');
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error('Erreur lors de la sauvegarde de la clé API');
+      }
     } finally {
       setIsSaving(false);
     }
@@ -97,55 +100,23 @@ export function Settings() {
     switch (section) {
       case 'api':
         return (
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="api-key" className="block text-sm font-medium text-gray-700 mb-2">
-                Clé API OpenAI
-              </label>
-              <div className="relative">
-                <input
-                  id="api-key"
-                  type="password"
-                  value={settings.apiKey}
-                  onChange={(e) => handleApiKeyChange(e.target.value)}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#1C3F7C] focus:border-transparent"
-                  placeholder="sk-..."
-                />
-                <SecurityBadge type="api-key" />
-              </div>
-              <div className="flex justify-between items-center mt-4">
-                <p className="text-sm text-gray-500">
-                  Obtenez votre clé API sur{' '}
-                  <a
-                    href="https://platform.openai.com/api-keys"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#1C3F7C] hover:underline"
-                  >
-                    OpenAI
-                  </a>
-                </p>
-                <LoadingButton
-                  onClick={handleApiKeySave}
-                  isLoading={isSaving}
-                  loadingText="Sauvegarde..."
-                  className={clsx(
-                    'px-4 py-2 rounded-lg transition-colors',
-                    isSaving 
-                      ? 'bg-gray-300'
-                      : 'bg-[#1C3F7C] text-white hover:bg-opacity-90'
-                  )}
-                >
-                  Sauvegarder
-                </LoadingButton>
-              </div>
-            </div>
-          </div>
+          <ApiKeyInput
+            value={settings.apiKey}
+            onChange={handleApiKeyChange}
+            onSave={handleApiKeySave}
+            isLoading={isSaving}
+          />
         );
 
       case 'model':
         return (
           <div className="space-y-6">
+            <div className="bg-gray-50 p-4 rounded-lg mb-6">
+              <div className="flex items-center space-x-2 text-sm text-gray-600 mb-2">
+                <Info size={16} className="text-[#1C3F7C]" />
+                <p>Choisissez le modèle qui correspond le mieux à vos besoins</p>
+              </div>
+            </div>
             <ModelSelector
               selectedModel={settings.model.selected}
               onModelSelect={(model) =>
@@ -184,6 +155,9 @@ export function Settings() {
                 <span>Précis</span>
                 <span>Créatif</span>
               </div>
+              <p className="text-sm text-gray-500 mt-2">
+                Valeur actuelle : {settings.model.temperature}
+              </p>
             </div>
           </div>
         );
@@ -191,15 +165,19 @@ export function Settings() {
       case 'knowledge':
         return (
           <div className="space-y-4">
+            <div className="bg-gray-50 p-4 rounded-lg mb-4">
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <Info size={16} className="text-[#1C3F7C]" />
+                <p>Les documents ajoutés permettront d'enrichir le contexte pour des réponses plus pertinentes</p>
+              </div>
+            </div>
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
               <Database size={24} className="mx-auto text-gray-400 mb-2" />
               <p className="text-sm text-gray-600 mb-4">
                 Déposez vos fichiers PDF ici ou{' '}
                 <button className="text-[#1C3F7C] hover:underline">parcourez</button>
               </p>
-              <p className="text-xs text-gray-500">
-                Les PDF ajoutés permettront d'enrichir le contexte pour des réponses plus pertinentes
-              </p>
+              <SecurityBadge type="data-privacy" />
             </div>
             {settings.knowledge.files.length > 0 && (
               <div className="mt-4">

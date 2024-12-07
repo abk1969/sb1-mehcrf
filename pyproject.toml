@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "globacom3000reply"
+version = "0.1.0"
+description = "AI-powered response generator with agent capabilities"
+authors = ["abk1969 <globacom3000@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+phidata = "*"
+openai = "*"
+sqlalchemy = "*"
+psycopg = {extras = ["binary"], version = "*"}
+pgvector = "*"
+fastapi = {extras = ["standard"], version = "*"}
+pypdf = "*"
+python-dotenv = "*"
+uvicorn = "*"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
